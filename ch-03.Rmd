@@ -1,0 +1,459 @@
+# Statistical Rethinking, Chapter 3
+
+Conditional probability of positive result on test, given rare underlying probability of event
+
+```{r 3.1}
+PrPV <- 0.95                            # P(positive|vampire)
+PrPM <- 0.01                            # P(positive|mortal)
+PrV <- 0.001                            # P(vampire)
+PrP <- PrPV*PrV + PrPM*(1-PrV)          # P(positive) = [total prob.]
+( PrVP <- PrPV*PrV / PrP )              # P(vampire|positive)
+```
+
+## 3.1 Sampling form grid-approximate posterior
+
+```{r 3.2}
+# grid approximation
+p_grid <- seq(from=0, to=1, length.out=1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(6, size=9, prob=p_grid)
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+```
+
+sampling from the posterior
+
+```{r 3.3}
+samples <- sample(p_grid, prob=posterior, size=1e4, replace=TRUE)
+```
+
+```{r 3.4}
+par(mfcol=c(1,2))
+plot(samples, col=alpha("royalblue2", 0.3), pch=16,
+     xlab="sample number", ylab="proportion water (p)")
+```
+
+```{r 3.5}
+library(rethinking)
+dens(samples, lwd=1.5, col="royalblue2", xlab="proportion water (p)")
+```
+
+## 3.2 Sampling to summarize
+
+```{r 3.6}
+# add up posterior from grid approximation
+sum(posterior[p_grid < 0.5])
+```
+
+```{r 3.7}
+# defined boundary interval, upper bound
+sum(samples < 0.5) / 1e4
+```
+
+```{r 3.8}
+# defined boundary interval, region
+sum(samples > 0.5 & samples < 0.75) / 1e4
+```
+
+```{r 3.9}
+# defined mass interval, upper bound
+quantile(samples, 0.8)
+```
+
+```{r 3.10}
+# defined mass interval, region
+quantile(samples, c(0.1, 0.9))
+```
+
+### Percentile Intervals can be misleading
+
+Percentile intervals assign equal probability mass to each tail. For example, a 95% percentile interval (often called a __confidence interval_) excludes 2.5% probability mass on each side.
+
+This will work poorly if the distribution is highly skewed. For example,
+
+```{r 3.11}
+p_grid <- seq(from=0, to=1, length.out=1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(3, size=3, prob=p_grid) # 3 successes in 3 trials
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+samples <- sample(p_grid, size=1e4, replace=TRUE, prob=posterior)
+```
+
+The 50% percentile interval (PI) provides the bounds on a central 50% probability. But the interval excludes the most probable values in this skewed distribution
+
+```{r 3.12}
+PI(samples, prob=0.5)
+```
+
+By contrast, the 50% highest posterior density interval (HPDI) is the narrowest interval that contains 50% mass. It will choose the 'densest' possible region.
+
+```{r 3.13}
+HPDI(samples, prob=0.5)
+```
+
+```{r fig3.3}
+# recreate figure 3.3
+par(mfrow=c(1,2))
+
+plot(p_grid, posterior, type='l',
+     xlab="proportion water (p)", xaxp=c(0, 1, 4),
+     ylab="density")
+pi <- PI(samples, prob=0.5)
+coord.select <- p_grid >= pi[1] & p_grid <= pi[2]
+coord.x <- c(pi[1], p_grid[coord.select], pi[2])
+coord.y <- c(0, posterior[coord.select], 0)
+polygon(coord.x, coord.y, col="royalblue2", border=NA)
+title('50% Percentile Interval')
+
+plot(p_grid, posterior, type='l',
+     xlab="proportion water (p)", xaxp=c(0, 1, 4),
+     ylab="density")
+hpdi <- HPDI(samples, prob=0.5)
+coord.select <- p_grid >= hpdi[1] & p_grid <= hpdi[2]
+coord.x <- c(hpdi[1], p_grid[coord.select], hpdi[2])
+coord.y <- c(0, posterior[coord.select], 0)
+polygon(coord.x, coord.y, col="royalblue2", border=NA)
+title('50% HPDI')
+```
+
+### 3 point estimates: mean, median, mode
+
+_maximum a posteriori (MAP)_ estimate, by grid:
+
+```{r 3.14}
+# MAP/mode
+p_grid[which.max(posterior)]
+```
+
+_maximum a posteriori (MAP)_ estimate, by sampling:
+
+```{r 3.15}
+# from rethinking package
+chainmode(samples, adj=0.01)
+```
+
+mean or median:
+
+```{r 3.16}
+mean(samples)
+median(samples)
+```
+
+## Loss functions
+
+Let decision $d = 0.5$ be the guess that the true value of parameter $p$ is $0.5$. Then choose the loss to be $d - p$ (the absolute loss), thus _weighted average loss_ is:
+
+```{r 3.17}
+sum(posterior*abs(0.5-p_grid))
+```
+
+where the weights are the posterior probabilities for each loss given each parameter $p$ in vector `p_grid`.
+
+
+Getting losses for all decisions:
+
+```{r 3.18}
+## all decisions
+loss <- sapply(p_grid, function(d) sum(posterior*abs(d-p_grid)))
+```
+
+Find the loss-minimizing decision (which will be the median):
+
+```{r 3.19}
+p_grid[which.min(loss)]
+# == median(samples)
+```
+
+Choice of loss function, most common:
+
+  * absolute loss ($d - p$) --> median
+  * quadratic loss ($(d - p)^2$) --> mean
+
+
+```{r plot-loss}
+par(mfrow=c(1,1))
+abs_losses <- loss
+plot(p_grid, abs_losses, type='l')  # absolute loss
+points(p_grid[which.min(abs_losses)],
+       abs_losses[which.min(abs_losses)], col='red')
+points(median(samples),
+       abs_losses[which.min(abs_losses)], col='royalblue2')
+
+quad_loss <- function(d) sum(posterior * (d - p_grid)^2)
+quad_losses <- sapply(p_grid, quad_loss)
+lines(p_grid, quad_losses, type='l')
+points(p_grid[which.min(quad_losses)],
+       quad_losses[which.min(quad_losses)], col='red')
+points(mean(samples),
+       quad_losses[which.min(quad_losses)], col='royalblue2')
+
+ylim(c(0, 1))
+```
+
+## Sampling for simulation
+
+Likelihood for globe tossing model is binomial likelihood
+
+```{r 3.20}
+# P(w | n,p) -- probability of water, given n tosses and proportion p = 0.7
+dbinom(0:2, size=2, prob=0.7)
+```
+
+```{r 3.21}
+# a single observation of a 2 toss trial
+rbinom(1, size=2, prob=0.7)
+```
+
+```{r 3.22}
+# 10 observations of a 2 toss trial
+rbinom(10, size=2, prob=0.7)
+```
+
+```{r 3.23}
+# compare simulation frequencies to analytical solution in 3.20
+dummy_w <- rbinom(1e5, size=2, prob=0.7)
+table(dummy_w)/1e5
+```
+
+```{r 3.24}
+# increase to 9 tosses per trial
+dummy_w <- rbinom(1e5, size=9, prob=0.7)
+simplehist(dummy_w, xlab="dummy water count")
+```
+
+```{r 3.25}
+# simulating predicted observations given known p=0.6
+w <- rbinom(1e4, size=9, prob=0.6)
+```
+
+```{r 3.26}
+# using posterior samples to drive probabilities for simulation
+w <- rbinom(1e4, size=9, prob=samples)
+```
+
+
+## Exercises
+
+### Easy
+
+```{r 3.27}
+# setup for Easy exercises
+p_grid <- seq(from=0, to=1, length.out=1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(6, size=9, prob=p_grid)
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+set.seed(100)
+samples <- sample(p_grid, prob=posterior, size=1e4, replace=TRUE)
+```
+
+#### 3E1
+
+How much posterior probability lies below p = 0.2?
+
+```{r ex-3E1}
+sum(samples < 0.2) / 1e4
+```
+
+#### 3E2
+
+How much posterior probability lies above p = 0.8?
+
+```{r ex-3E2}
+sum(samples > 0.8) / 1e4
+```
+
+#### 3E3
+
+How much posterior probability lies between p = 0.2 and p = 0.8?
+
+```{r ex-3E3}
+sum(samples > 0.2 & samples < 0.8) / 1e4
+```
+
+#### 3E4
+
+20% of the posterior probability lies below which value of p?
+
+```{r ex-3E4}
+quantile(samples, 0.2)
+```
+
+#### 3E5
+
+20% of the posterior probability lies above which value of p?
+
+```{r ex-3E5}
+quantile(samples, 0.8)
+```
+
+#### 3E6
+
+Which values of p contain the narrowest interval equal to 66% of the posterior probability?
+
+```{r ex-3E6}
+HPDI(samples, 0.66)
+```
+
+#### 3E7
+
+Which values of p contain 66% of the posterior probability, assuming equal posterior probability both below and above the interval?
+
+```{r ex-3E7}
+PI(samples, 0.66)
+```
+
+
+### Medium
+
+#### 3M1
+
+Adjust grid approximation code from above, for 8 water in 15 tosses
+
+```{r ex-3M1}
+w <- 8
+n <- 15
+p_grid <- seq(from=0, to=1, length.out=1000)  # grid
+prior <- rep(1, 1000)                         # flat prior
+likelihood <- dbinom(w, size=n, prob=p_grid) # 8 water in 15 tosses
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+```
+
+#### 3M2
+
+Sample from the posterior, and calculate the 90% HPDI for p
+
+```{r ex-3M2
+trials <- 1e4
+set.seed(100)
+samples <- sample(x=p_grid, prob=posterior, size=trials, replace=TRUE)
+HPDI(samples, 0.9)
+```
+
+```{r}
+plot(p_grid, posterior, type='l',
+     xlab="proportion water (p)", xaxp=c(0, 1, 4),
+     ylab="density")
+hpdi <- HPDI(samples, prob=0.9)
+coord.select <- p_grid >= hpdi[1] & p_grid <= hpdi[2]
+coord.x <- c(hpdi[1], p_grid[coord.select], hpdi[2])
+coord.y <- c(0, posterior[coord.select], 0)
+polygon(coord.x, coord.y, col="royalblue2", border=NA)
+title('90% HPDI')
+```
+
+#### 3M3
+
+Posterior predictive check
+
+```{r ex-3M3}
+w <- rbinom(trials, size=n, prob=samples)
+mean(w == 8) # probability of 8 water in 15 tosses
+```
+
+#### 3M4
+
+Probability of 6 water in 9 tosses, given a prior from previous data: 8 water in 15 tosses.
+
+```{r ex-3M4}
+w2 <- rbinom(trials, size=9, prob=samples)
+simplehist(w2)
+mean(w2 == 6)
+```
+
+#### 3M5
+
+```{r ex-3M5}
+p_grid <- seq(from=0, to=1, length.out=1000)
+
+prior3 <- rep(1, 1000)
+prior3[p_grid < 0.5] <- 0
+
+likelihood3 <- dbinom(8, size=15, prob=p_grid)
+posterior3 <- likelihood3 * prior3
+posterior3 <- posterior3 / sum(posterior3)
+set.seed(100)
+samples3 <- sample(p_grid, prob=posterior3, size=1e4, replace=TRUE)
+
+# 3M2'
+HPDI(samples3, 0.9)
+
+# 3M3'
+w3 <- rbinom(1e4, size=15, prob=samples3)
+mean(w3 == 8) # probability of 8 water in 15 tosses
+
+# 3M4'
+w4 <- rbinom(1e4, size=9, prob=samples3)
+simplehist(w4)
+mean(w4 == 6)
+```
+
+```{r}
+par(mfrow=c(1,2))
+simplehist(w3, xlim=c(0, 15))
+simplehist(w4, xlim=c(0, 15))
+```
+
+### Hard
+
+```{r 3.29}
+data(homeworkch3)
+```
+
+#### 3H1
+
+```{r ex-3H1}
+p_grid <- seq(from=0, to=1, length.out=1000)
+
+prior <- rep(1, 1000)                   # flat prior
+
+nboy <- sum(birth1 == 1) + sum(birth2 == 1)
+n <- length(birth1) + length(birth2)
+likelihood <- dbinom(nboy, size=n, prob=p_grid)
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+
+# two ways to calculate mode
+chainmode(samples)
+p_grid[which.max(posterior)]
+```
+
+#### 3H2
+
+```{r ex-3H2}
+set.seed(100)
+samples <- sample(p_grid, prob=posterior, size=1e4, replace=TRUE)
+HPDI(samples, prob=c(0.5, 0.89, 0.97))
+```
+
+#### 3H3
+
+```{r ex-3H3}
+boys <- rbinom(1e4, 200, prob=samples)
+dens(boys, col='royalblue2', show.HPDI=0.95)
+abline(v=111, col='gray')
+```
+
+#### 3H4
+
+```{r ex-3H4}
+boys2 <- rbinom(1e4, size=100, prob=samples)
+
+dens(boys2, col="royalblue2")
+abline(v=sum(birth1 ==  1))
+```
+
+#### 3H5
+
+```{r ex-3H5}
+BOY <- 1
+GIRL <- 0
+girls_1st <- sum(birth1 ==  GIRL)
+boy_after_girl_ppc <- rbinom(1e4, size=girls_1st, prob=samples)
+
+simplehist(boy_after_girl_ppc, adj=0.1, col='royalblue2')
+boy_after_girl_actual <- birth2[birth1 == GIRL]
+abline(v=sum(boy_after_girl_actual), col='gray')
+```

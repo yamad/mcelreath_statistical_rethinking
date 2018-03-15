@@ -126,3 +126,113 @@ p_land <- sum(c(p_land_earth, p_land_mars) * c(p_earth, p_mars))
 p_earth_land <- (p_land_earth * p_earth) / p_land
 p_earth_land
 ```
+
+### 2M4
+
+```{r ex-2M4}
+p_card <- 1/3
+p_black <- sum(c(1, 0.5, 0) * p_card)
+p_black_c2 <- 1
+# pr(two-black|black) <- (pr(black|two-black) * pr(two-black)) / pr(black)
+p_c2_black <- (p_black_c2 * p_card) / p_black
+p_c2_black
+```
+
+### 2M5
+
+```{r ex-2M5}
+p_card <- 1/4
+p_black <- sum(c(1, 1/2, 0, 1) * p_card)
+p_c2_black <- (p_black_c2 * p_card) / p_black
+p_c2_black
+```
+
+### 2M6
+
+```{r ex-2M6}
+p_card <- c(1/6, 2/6, 3/6)
+sides_black <- c(2, 1, 0)
+names(p_card) <- c('c2', 'c1', 'c0')
+p_black <- sum(sides_black/2 * p_card)
+p_c2_black <- (p_black_c2 * p_card['c2']) / p_black
+p_c2_black
+```
+
+### Hard
+
+#### 2H1
+
+```{r ex-2H1}
+# P(Twin | SpeciesA) = P(T|A) = 0.1
+# P(Twin | SpeciesB) = P(T|B) = 0.2
+# P(A) = P(B) = 0.5
+p_t_a <- 0.1
+p_t_b <- 0.2
+p_a <- 0.5
+p_b <- 0.5
+
+# total probability of a twin
+# P(T) = P(T|A) * P(A) + P(T|B) * P(B)
+p_twin <- p_t_a * p_a + p_t_b * p_b
+
+# conditional probability of species, given observing a twin
+p_a_t <- (p_t_a * p_a) / p_twin
+p_b_t <- (p_t_b * p_b) / p_twin
+
+# probability of twin, given a twin
+# P(T|T) = P(T|A)*P(T,A) + P(T|B)*P(T,B)
+p_t_t <- p_t_a * p_a_t + p_t_b * p_b_t
+p_t_t
+```
+
+The probability is somewhere between the two priors (0.1 and 0.2), but
+slightly favoring species B.
+
+#### 2H2
+
+```{r ex-2H2}
+# P(A|T) = P(T|A)*P(A) / P(T), calculated above
+p_a_t
+```
+
+#### 2H3
+
+```{r ex-2H3}
+p_s_a <- 1 - p_t_a
+p_s_b <- 1 - p_t_b
+# P(Single) = P(S) = P(S|A)*P(A) + P(S|B)*P(B)
+# conditioned on having twin first,
+#   P(S|T) = P(S|A)*P(A,T) + P(S|B)*P(B,T)
+p_s_t <- p_s_a * p_a_t + p_s_b * p_b_t
+
+# P(A|TS) = P(S|A)*P(A|T) / P(S|T)
+p_a_ts = (p_s_a * p_a_t) / p_s_t
+p_a_ts
+```
+
+### 2H4
+
+```{r ex-2H4}
+# no prior information on births
+# P(TestA|A) = 0.8
+# P(TestB|B) = 0.65
+p_tA_a <- 0.8
+p_tB_b <- 0.65
+p_tA_b <- 1 - p_tB_b
+
+# P(TestA) = P(TestA|A)*P(A) + P(TestA|B)*P(B)
+p_tA <- p_tA_a * 0.5 + (1 - p_tB_b) * 0.5
+
+# P(A|TestA) = P(TestA|A)*P(A) / P(TestA)
+p_a_tA <- p_tA_a * 0.5 / p_tA
+p_a_tA
+
+# with priors on births
+# P(TestA|TS) = P(TestA|A)*P(A|TS) + P(TestA|B)*P(B|TS)
+p_b_ts <- (p_s_b * p_b_t) / p_s_t
+p_tA_ts <- p_tA_a * p_a_ts + p_tA_b * p_b_ts
+
+# P(A|TestA,TS) = P(TestA|A)*P(A|TS) / P(TestA|TS)
+p_a_tAts <- p_tA_a * p_a_ts / p_tA_ts
+p_a_tAts
+```
