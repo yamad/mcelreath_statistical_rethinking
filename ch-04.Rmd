@@ -608,3 +608,88 @@ $\mu_i = \alpha + \beta x_i$ is the linear model
 #### 4E5
 
 There are 3 parameters: $\alpha$, $\beta$, and $\sigma$
+
+
+### Medium
+
+#### 4M1
+
+```{r ex-4M1}
+prior_mu <- rnorm(1e4, 0, 10)
+prior_sigma <- runif(1e4, 0, 10)
+prior_y <- rnorm(1e4, mean=prior_mu, sd=prior_sigma)
+dens(prior_y)
+```
+
+#### 4M2
+
+```{r ex-4M2}
+alist(
+    height ~ dnorm(mu, sigma),
+    mu ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+    )
+```
+
+#### 4M3
+
+$$
+\begin{align}
+y_i &\sim \text{Normal}(\mu, \sigma) \\
+mu_i &= \alpha + \beta*x_i \\
+\alpha &\sim \text{Normal}(0, 50) \\
+\beta &\sim \text{Uniform}(0, 10) \\
+\sigma &\sim \text{Uniform}(0, 50)
+\end{align}
+$$
+
+#### 4M4
+
+$$
+\begin{align}
+height &\sim \text{Normal}(\mu, \exp(\log(\sigma))) \\
+mu_i &= \alpha + \beta*\text{year}__i \\
+\alpha &\sim \text{Normal}(120, 60) \\
+\beta &\sim \text{Normal}(4, 10) \\
+\log(\sigma) &\sim \text{Normal}(3, 10)
+\end{align}
+$$
+
+  - prior for $\alpha$ is centered around 120 cm (~ 4 ft), but has a fairly broad variance that accepts that the initial heights may easily be as little as 2 ft to 6 ft.
+  - $\beta$ prior suggests that students may grow roughly 2 inches a year, but could just as well grow not at all or about half a foot.
+  - $\sigma$ prior is log transformed to constrain $\sigma > 0$. On the log scale, the prior parameters suggest that a best guess is that $\sigma$ is $\exp(3) \approx 20 cm$, but could be almost anything ($\exp(3-10) \approx 0, \exp(13) \approx 450000). This is probably weaker than necessary.
+
+#### 4M5
+
+Now that we _know_ $\alpha$ is 120 cm, the variance of the $\alpha$ prior can be 0. One option would be to remove it as a parameter, but perhaps better to give a very tight prior around 120 cm. Say, $\alpha \sim \text{Normal}(120, 2).
+
+All students got taller suggests a prior that must be positive. Perhaps an exponential prior is a better fit, $\beta \sim \text{Exp}(...)$, or a log-transformed prior $\log(\beta) \sim \text{Normal}(1, 1.2).
+
+```{r}
+par(mfcol=c(1,2))
+curve(dnorm(x, 120, 2), xlim=c(100, 140), n=1e4)
+curve(dnorm(log(x), 1, 1.2), xlim=c(0, 100), n=1e4)
+```
+
+#### 4M6
+
+A height variance ($\sigma^2$) always under 64 cm allows a narrower
+$\sigma$ prior. We used a log-transformed prior, and $\ln(\sqrt(64)) = 2$, so a new prior might be $\log(\sigma) \sim \text{Normal(1, .4)}$. This puts very little mass above 64 cm.
+
+```{r}
+curve(dnorm(log(sqrt(x)), 1, .4), xlim=c(0, 100))
+
+1 - pnorm(log(sqrt(64)), 1, .4) # 0.3%
+```
+
+This leaves the updated final model as
+
+$$
+\begin{align}
+height &\sim \text{Normal}(\mu, \sigma) \\
+mu_i &= \alpha + \beta*\text{year}__i \\
+\alpha &\sim \text{Normal}(120, 2) \\
+\log(beta) &\sim \text{Normal}(1, 1.2) \\
+\log(\sigma) &\sim \text{Normal}(1, 0.4)
+\end{align}
+$$
