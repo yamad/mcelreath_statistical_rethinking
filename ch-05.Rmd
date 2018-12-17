@@ -46,3 +46,1007 @@ m5.2 <- map(
     sigma ~ dunif(0, 10)
   ), data = d)
 ```
+
+
+# Multiple regression
+
+```{r 5.4}
+m5.3 <- map(
+  alist(
+    Divorce ~ dnorm(mu, sigma),
+    mu <- a + bR*Marriage.s + bA*MedianAgeMarriage.s,
+    a ~ dnorm(10, 10),
+    bR ~ dnorm(0, 1),
+    bA ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+
+precis(m5.3)
+```
+
+```{r 5.5}
+plot(precis(m5.3))
+```
+
+Age of marriage has a negative correlation. Rate of marriage does not add predictive power, once age is known.
+
+## Plotting multivariate posteriors
+
+### Predictor residual plots
+
+1) Use one predictor to model the other. e.g. use age to model marriage rate
+
+```{r 5.6}
+m5.4 <- map(
+  alist(
+    Marriage.s ~ dnorm(mu, sigma),
+    mu <- a + b*MedianAgeMarriage.s,
+    a ~ dnorm(0, 10),
+    b ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+```
+
+2) Compute residuals from model
+
+```{r 5.7}
+# compute expected value at MAP, for each State
+mu <- coef(m5.4)['a'] + coef(m5.4)['b']*d$MedianAgeMarriage.s
+# compute residual for each State
+m.resid <- d$Marriage.s - mu
+```
+
+3) Plot marriage rate against age
+
+```{r 5.8}
+plot(Marriage.s ~ MedianAgeMarriage.s, d, col=rangi2)
+abline(m5.4)
+# draw residuals, loop over States
+for (i in 1:length(m.resid)) {
+  x <- d$MedianAgeMarriage.s[i] # x location of line segment
+  y <- d$Marriage.s[i] # observed endpoint of line segment
+  # draw the line segment
+  lines(c(x, x), c(mu[i], y), lwd=0.5, col=col.alpha("black", 0.7))
+}
+```
+
+Plot residuals against outcome (figure 5.4)
+
+```{r}
+par(mfrow=c(1,2))
+
+plot(Divorce ~ m.resid, d, col=rangi2,
+     xlab='Marriage rate residuals',
+     ylab='Divorce rate',
+     ylim=c(6, 15))
+abline(v=0, lty='dashed')
+extents <- par('usr')
+names(extents) <- c('xmin', 'xmax', 'ymin', 'ymax')
+text(x=-0, y=extents['ymax']-0.3, 'slower', pos=2)
+text(x=-0, y=extents['ymax']-0.3, 'faster', pos=4)
+
+m5.4b <- map(
+  alist(
+    Divorce ~ dnorm(mu, sigma),
+    mu <- a + b*m.resid,
+    a ~ dnorm(0, 10),
+    b ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  )
+, data=d)
+
+resid.seq <- seq(-3, 3, 0.1)
+mu <- link(m5.4b, data=data.frame(m.resid=resid.seq))
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+lines(resid.seq, mu.mean)
+shade(mu.PI, resid.seq)
+
+## age residuals
+m5.4c <- map(
+  alist(
+    MedianAgeMarriage.s ~ dnorm(mu, sigma),
+    mu <- a + b*Marriage.s,
+    a ~ dnorm(10, 10),
+    b ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  )
+, data=d)
+
+a.mu <- coef(m5.4c)['a'] + coef(m5.4c)['b'] * d$Marriage.s
+a.resid <- d$MedianAgeMarriage.s - a.mu
+
+m5.4d <- map(
+  alist(
+    Divorce ~ dnorm(mu, sigma),
+    mu <- a + b*a.resid,
+    a ~ dnorm(0, 10),
+    b ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  )
+, data=d)
+
+plot(Divorce ~ a.resid, data=d, col=rangi2,
+     xlab='Age of marriage residuals',
+     ylab='Divorce rate',
+     ylim=c(6, 15))
+mu <- link(m5.4d, data=data.frame(a.resid=resid.seq))
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+lines(resid.seq, mu.mean)
+shade(mu.PI, resid.seq)
+
+abline(v=0, lty='dashed')
+extents <- par('usr')
+names(extents) <- c('xmin', 'xmax', 'ymin', 'ymax')
+text(x=-0, y=extents['ymax']-0.3, 'younger', pos=2)
+text(x=-0, y=extents['ymax']-0.3, 'older', pos=4)
+
+par(mfrow=c(1,1))
+```
+
+### Counterfactual plots
+
+Vary one predictor, holding other predictors constant. Observe predictions.
+
+```{r 5.9}
+# prepare new counterfactual
+A.avg <- mean(d$MedianAgeMarriage.s)
+R.seq <- seq(from=-3, to=3, length.out=30)
+pred.data <- data.frame(
+  Marriage.s=R.seq,
+  MedianAgeMarriage.s=A.avg
+)
+
+# compute counterfactual mean divorce (mu)
+mu <- link(m5.3, data=pred.data)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+# simulate counterfactual divorce outcomes
+R.sim <- sim(m5.3, data=pred.data, n=1e4)
+R.PI <- apply(R.sim, 2, PI)
+
+par(mfrow=c(1,2))
+# display predictions, hiding raw data with type='n'
+plot(Divorce ~ Marriage.s, data=d, type='n')
+mtext("MedianAgeMarriage.s = 0")
+lines(R.seq, mu.mean)
+shade(mu.PI, R.seq)
+shade(R.PI, R.seq)
+```
+
+```{r 5.10}
+R.avg <- mean(d$Marriage.s)
+A.seq <- seq(from=-3, to=3.5, length.out=30)
+pred.data2 <- data.frame(
+  Marriage.s=R.avg,
+  MedianAgeMarriage.s=A.seq
+)
+
+mu <- link(m5.3, data=pred.data2)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+A.sim <- sim(m5.3, data=pred.data2, n=1e4)
+A.PI <- apply(A.sim, 2, PI)
+
+plot(Divorce ~ MedianAgeMarriage.s, data=d, type='n')
+mtext("Marriage.s = 0")
+lines(A.seq, mu.mean)
+shade(mu.PI, A.seq)
+shade(A.PI, A.seq)
+```
+
+Direct display of the effect of varying one variable. Counterfactual because the combinations of parameters are usually not observed, and may be impossible in the real world.
+
+### Posterior prediction plots
+
+simulate predictions, average over posterior
+
+```{r 5.11}
+# call link without specifying new data
+# so it uses original data
+mu <- link(m5.3)
+
+# summarize samples across cases
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+# simulate observations
+# again no new data, so uses original data
+divorce.sim <- sim(m5.3, n=1e4)
+divorce.PI <- apply(divorce.sim, 2, PI)
+```
+
+first pass, plot predictions against observed
+
+```{r}
+#             [2]      [1]
+layout(matrix(c(1,2,3,2), 2, 2, byrow=TRUE))
+# [1] make a two-by-two layout
+# [2] assign plot locations by index
+#       [[1, 2]
+#        [3, 2]]
+#       plot 1 is upper left
+#       plot 2 is full right side
+#       plot 3 is lower left
+```
+
+```{r 5.12}
+plot(mu.mean ~ d$Divorce, col=rangi2, ylim=range(mu.PI),
+     xlab='Observed divorce', ylab='Predicted outcome')
+abline(a=0, b=1, lty=2)
+for (i in 1:nrow(d))
+  lines(rep(d$Divorce[i],2), c(mu.PI[1,i], mu.PI[2, i]),
+        col=rangi2)
+```
+
+label a few points. gives point and click interface
+
+```{r 5.13}
+#identify(x=d$Divorce, y=mu.mean, labels=d$Loc, cex=0.8)
+```
+
+second pass, also plot residuals to see error more directly
+
+```{r 5.14}
+# compute residuals
+divorce.resid <- d$Divorce - mu.mean
+# get ordering by divorce rate
+o <- order(divorce.resid)
+# make the plot
+dotchart(divorce.resid[o], labels=d$Loc[o], xlim=c(-6,5), cex=0.6)
+abline(v=0, col=col.alpha("black", 0.2))
+for (i in 1:nrow(d)) {
+  j <- o[i] # which state in order
+  lines(d$Divorce[j]-c(mu.PI[1,j], mu.PI[2,j]), rep(i, 2))
+  points(d$Divorce[j]-c(divorce.PI[1,j], divorce.PI[2,j]), rep(i,2),
+         pch=3, cex=0.6, col="gray")
+}
+```
+
+```{r}
+# make figure 5.6c
+pcap <- d$WaffleHouses/d$Population
+plot(divorce.resid ~ pcap, col=rangi2)
+
+m5.4e <- map(
+  alist(
+    divorce.resid ~ dnorm(mu, sigma),
+    mu <- a + b*pcap,
+    a ~ dnorm(0, 10),
+    b ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  )
+, data=data.frame(divorce.resid, pcap))
+
+x <- seq(from=-5, to=45, length.out=50)
+mu <- link(m5.4e, data.frame(pcap=x))
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+lines(x, mu.mean)
+shade(mu.PI, x)
+```
+
+```{r}
+par(def.par) # reset to default
+```
+
+
+## Masked relationship
+
+Milk and primate species as demo dataset
+
+```{r 5.16}
+library(rethinking)
+data(milk)
+d <- milk
+str(d)
+```
+
+```{r 5.17}
+# will throw error b/c of NA values
+m5.5 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bn*neocortex.perc,
+    a ~ dnorm(0, 100),
+    bn ~ dnorm(0, 1),
+    sigma ~ dunif(0, 1)
+  ),
+  data=d)
+```
+
+```{r 5.19}
+# drop cases with missing values
+dcc <- d[complete.cases(d),]
+```
+
+```{r 5.20}
+m5.5 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bn*neocortex.perc,
+    a ~ dnorm(0, 100),
+    bn ~ dnorm(0, 1),
+    sigma ~ dunif(0, 1)
+  ),
+  data=dcc)
+```
+
+
+```{r 5.21}
+precis(m5.5, digits=3)
+```
+
+The association is very small, and is imprecise.
+
+```{r 5.22}
+# change from smallest to largest neocortex percent ~ 0.1 kcal
+coef(m5.5)["bn"] * (76 - 55)
+```
+
+Plot the neocortex size to kcal association. Note large uncertainty and weakly positive slope.
+
+```{r}
+np.seq <- 0:100
+pred.data <- data.frame(neocortex.perc=np.seq)
+
+mu <- link(m5.5, data=pred.data, n=1e4)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+par(mfrow=c(2,2))
+plot(kcal.per.g ~ neocortex.perc, data=dcc, col=rangi2)
+lines(np.seq, mu.mean)
+lines(np.seq, mu.PI[1,], lty=2)
+lines(np.seq, mu.PI[2,], lty=2)
+```
+
+```{r 5.24}
+dcc$log.mass <- log(dcc$mass)
+```
+
+```{r 5.25}
+m5.6 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bm*log.mass,
+    a ~ dnorm(0, 100),
+    bm ~ dnorm(0, 1),
+    sigma ~ dunif(0, 1)
+  ),
+  data=dcc)
+
+precis(m5.6)
+```
+
+The association is negative this time, but is still weak and uncertain.
+
+```{r}
+lm.seq <- seq(-4, 5, length.out=30)
+pred.data <- data.frame(log.mass=lm.seq)
+
+mu <- link(m5.6, data=pred.data, n=1e4)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+plot(kcal.per.g ~ log.mass, data=dcc, col=rangi2)
+lines(lm.seq, mu.mean)
+lines(lm.seq, mu.PI[1,], lty=2)
+lines(lm.seq, mu.PI[2,], lty=2)
+```
+
+Now, both neocortex and log.mass together
+
+```{r 5.26}
+m5.7 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bn*neocortex.perc + bm*log.mass,
+    a ~ dnorm(0, 100),
+    bn ~ dnorm(0, 1),
+    bm ~ dnorm(0, 1),
+    sigma ~ dunif(0, 1)
+  ),
+data=dcc)
+precis(m5.7)
+```
+
+Plot counterfactual plots from the multivariate regression
+
+```{r 5.27}
+mean.log.mass <- mean(log(dcc$mass))
+np.seq <- 0:100
+pred.data <- data.frame(
+  neocortex.perc=np.seq,
+  log.mass=mean.log.mass
+)
+
+mu <- link(m5.7, data=pred.data, n=1e4)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+plot(kcal.per.g ~ neocortex.perc, data=dcc, type="n")
+lines(np.seq, mu.mean)
+lines(np.seq, mu.PI[1,], lty=2)
+lines(np.seq, mu.PI[2,], lty=2)
+```
+
+```{r}
+mean.neocortex.prec <- mean(dcc$neocortex.perc)
+lm.seq <- seq(-4, 5, length.out=100)
+pred.data <- data.frame(
+  neocortex.perc=mean.neocortex.prec,
+  log.mass=lm.seq
+)
+
+mu <- link(m5.7, data=pred.data, n=1e4)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+plot(kcal.per.g ~ log.mass, data=dcc, type="n")
+lines(lm.seq, mu.mean)
+lines(lm.seq, mu.PI[1,], lty=2)
+lines(lm.seq, mu.PI[2,], lty=2)
+```
+
+```{r}
+par(def.par)
+```
+
+## When adding variables hurts
+
+Problems with adding too many variables
+
+  1. multicollinearity
+  2. post-treatment bias
+  3. overfitting
+
+
+### Multicollinearity
+
+```{r 5.29}
+N <- 100                                # number of individuals
+height <- rnorm(N, 10, 2)               # sim total height of each
+leg_prop <- runif(N, 0.4, 0.5)          # leg as proportion of height
+leg_left <- leg_prop*height +           # sim left leg as proportion + error
+  rnorm(N, 0, 0.02)
+leg_right <- leg_prop*height +          # sim right leg as proportion + error
+  rnorm(N, 0, 0.02)
+
+## combine into data frame
+d <- data.frame(height, leg_left, leg_right)
+```
+
+```{r 5.30}
+m5.8 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + bl*leg_left + br*leg_right,
+    a ~ dnorm(10, 100),
+    bl ~ dnorm(2, 10),
+    br ~ dnorm(2, 10),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.8)
+```
+
+Means and std dev look strange, because due to correlated variables there is a 'practically infinite number of combinations [of the two variables] that produce the same predictions'
+
+```{r 5.31}
+plot(precis(m5.8))
+```
+
+```{r 5.32}
+post <- extract.samples(m5.8)
+plot(bl ~ br, post, col=col.alpha(rangi2, 0.1), pch=16)
+```
+
+Model uses two coefficients for, essentially, one variable (here, leg length), so
+
+$$\mu_i = \alpha + (\beta_1 + \beta_2) x_i$$
+
+So the sum of the coefficients provides the estimate, but a nearly infinite combination of values can satisfy the sum.
+
+```{r 5.33}
+sum_blbr <- post$bl + post$br
+dens(sum_blbr, col=rangi2, lwd=2, xlab="sum of bl and br")
+```
+
+Fit with only one leg length. Here the coefficient is close to the sum of the two coefficients in the last model.
+
+```{r 5.34}
+m5.9 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + bl*leg_left,
+    a ~ dnorm(10, 100),
+    bl ~ dnorm(2, 10),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.9)
+```
+
+### milk multicollinearity
+
+```{r 5.35}
+data(milk)
+d <- milk
+```
+
+Start with two independent regressions on fat and lactose
+
+```{r 5.36}
+# kcal.per.g regressed on perc.fat
+m5.10 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bf*perc.fat,
+    a ~ dnorm(0.6, 10),
+    bf ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+
+# kcal.per.g regressed on perc.lactose
+m5.11 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bl*perc.lactose,
+    a ~ dnorm(0.6, 10),
+    bl ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+
+precis(m5.10, digits=3)
+precis(m5.11, digits=3)
+```
+
+Associations look worse when both variables are included in one model, because they are so highly correlated with each other (they carry the same information).
+
+```{r 5.37}
+m5.12 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + bf*perc.fat + bl*perc.lactose,
+    a ~ dnorm(0.6, 10),
+    bf ~ dnorm(0, 1),
+    bl ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.12, digits=3)
+```
+
+```{r 5.38}
+pairs( ~ kcal.per.g + perc.fat + perc.lactose,
+      data=d, col=rangi2)
+```
+
+```{r 5.39}
+cor(d$perc.fat, d$perc.lactose)
+```
+
+### How to simulate collinearity (and correlated variables)
+
+```{r 5.40}
+library(rethinking)
+data(milk)
+d <- milk
+sim.coll <- function(r=0.9) {
+  d$x <- rnorm(nrow(d), mean=r*d$perc.fat,
+               sd=sqrt((1-r^2)*var(d$perc.fat)))
+  m <- lm(kcal.per.g ~ perc.fat + x, data=d)
+  sqrt(diag(vcov(m)))[2]                # stddev of parameter
+}
+rep.sim.coll <- function(r=0.9, n=100) {
+  stddev <- replicate(n, sim.coll(r))
+  mean(stddev)
+}
+r.seq <- seq(from=0, to=0.99, by=0.01)
+stddev <- sapply(r.seq, function(z) rep.sim.coll(r=z, n=100))
+plot(stddev ~ r.seq, type="l", col=rangi2, lwd=2, xlab="correlation")
+```
+
+## Post-treatment bias
+
+Should not include predictors that are consequences of the
+treatment. Otherwise, the estimate for effect of the treatment will be
+biased.
+
+Example: predict plant height from treatment. Variables may be
+`treatment`, presence of `fungus`, and `initial height`.
+
+First, we simulate some data:
+
+```{r 5.41}
+## number of plants
+N <- 100
+
+## simulate initial heights
+h0 <- rnorm(N, 10, 2)
+
+## assign treatments and simulate fungus and growth
+treatment <- rep(0:1, each=N/2)
+fungus <- rbinom(N, size=1, prob=0.5-treatment*0.4)
+h1 <- h0 + rnorm(N, 5 - 3*fungus)
+
+## compose a clean data frame
+d <- data.frame(h0=h0, h1=h1, treatment=treatment, fungus=fungus)
+```
+
+```{r 5.42}
+m5.13 <- map(
+  alist(
+    h1 ~ dnorm(mu, sigma),
+    mu <- a + bh*h0 + bt*treatment + bf*fungus,
+    a ~ dnorm(0, 100),
+    c(bh, bt, bf) ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.13)
+```
+
+The estimate of the treatment effect `bt` is negligible, even though
+we included a treatment effect in the simulation by construction.
+
+The problem is including `fungus`. If we control for `fungus`, which
+is also an outcome of treatment, we don't get any further information
+from `treatment`.
+
+This time omit the `fungus` variable
+
+```{r 5.43}
+m5.14 <- map(
+  alist(
+    h1 ~ dnorm(mu, sigma),
+    mu <- a + bh*h0 + bt*treatment,
+    a ~ dnorm(0, 100),
+    c(bh, bt) ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.14)
+```
+
+# Categorical variables
+
+## Binary categories
+
+Example: male/female
+
+```{r 5.44}
+data(Howell1)
+d <- Howell1
+str(d)
+```
+
+Measure effect of being `male` on height:
+
+```{r 5.45}
+m5.15 <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + bm*male,
+    a ~ dnorm(178, 100),
+    bm ~ dnorm(0, 10),
+    sigma ~ dunif(0, 50)
+  ),
+  data=d)
+precis(m5.15)
+```
+
+Don't just add together boundaries of parameters, because the
+parameters are correlated. Simple solution: sample from their joint
+posterior.
+
+```{r 5.46}
+post <- extract.samples(m5.15)
+mu.male <- post$a + post$bm
+PI(mu.male)
+```
+
+#### Re-parameterization
+
+Instructive to show that the same model can follow different math. Now `af` is the average female height and `am` is the average male height.
+
+```{r 5.47}
+m5.15b <- map(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- af*(1-male) + am*male,
+    af ~ dnorm(178, 100),
+    am ~ dnorm(178, 100),
+    sigma ~ dunif(0, 50)
+  ),
+  data=d)
+```
+
+## More than two categories
+
+Primate milk example. There are four clades:
+
+```{r 5.48}
+data(milk)
+d <- milk
+unique(d$clade)
+```
+
+Create dummy variables
+
+```{r 5.49}
+(d$clade.NWM <- ifelse(d$clade == "New World Monkey", 1, 0))
+```
+
+```{r 5.50}
+d$clade.OWM <- ifelse(d$clade == "Old World Monkey", 1, 0)
+d$clade.S <- ifelse(d$clade == "Strepsirrhine", 1, 0)
+```
+
+```{r 5.51}
+m5.16 <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a + b.NWM*clade.NWM + b.OWM*clade.OWM + b.S*clade.S,
+    a ~ dnorm(0.6, 10),
+    c(b.NWM, b.OWM, b.S) ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.16)
+```
+
+#### Exploration: including an ape parameter
+
+Removing the intercept and including a coefficient for ape mean `b.ape` also works:
+
+```{r}
+d$clade.ape <- ifelse(d$clade == "Ape", 1, 0)
+
+m5.16b <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- b.ape*clade.ape + b.NWM*clade.NWM + b.OWM*clade.OWM + b.S*clade.S,
+    c(b.ape, b.NWM, b.OWM, b.S) ~ dnorm(0, 1),
+    sigma ~ dunif(0, 10)
+  ), data=d)
+```
+
+
+### Back to original parameterization
+
+Getting average milk energy for each group (pretty much identical to `m5.16b` model):
+
+```{r}
+## using sampling
+post <- extract.samples(m5.16)
+
+## compute averages for each category
+mu.ape <- post$a
+mu.NWM <- post$a + post$b.NWM
+mu.OWM <- post$a + post$b.OWM
+mu.S <- post$a + post$b.S
+
+## summarize using precis
+precis(data.frame(mu.ape, mu.NWM, mu.OWM, mu.S))
+```
+
+Now we are working with posterior distributions, so answering a variety of questions is relatively straightforward. E.g. estimate difference between the monkey groups:
+
+```{r 5.53}
+diff.NWM.OWM <- mu.NWM - mu.OWM
+quantile(diff.NWM.OWM, probs=c(0.025, 0.5, 0.975))
+```
+
+Note: estimating a difference requires _computing the difference_, not just showing that one parameter is significant and the other is not.
+
+### Alternative parameterization: unique intercepts
+
+Create an index variable to indicate which group each sample belongs to.
+
+```{r 5.54}
+(d$clade_id <- coerce_index(d$clade))
+```
+
+```{r 5.55}
+m5.16_alt <- map(
+  alist(
+    kcal.per.g ~ dnorm(mu, sigma),
+    mu <- a[clade_id],            # one mean for each clade id
+    a[clade_id] ~ dnorm(0.6, 10), # all clade means have same starting prior
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+precis(m5.16_alt, depth=2)
+```
+
+## Exercises
+
+### Easy
+
+#### 5E1
+
+2 and 4. Both have a separate coefficient for each feature.
+
+1 and 3 have only one feature. In 3, the single feature is the
+difference between x and z.
+
+#### 5E2
+
+_Animal diversity is linearly related to latitude, but only after controlling for plant diversity_
+
+Model:
+
+```
+diversity ~ dnorm(mu, sigma),
+mu <- a + b.lat*latitude + b.plant*plant_diversity
+c(a, b.lat, b.plant) ~ dnorm(0, 100)
+sigma ~ dunif(0, 10)
+```
+
+#### 5E3
+
+_Neither amount of funding nor size of laboratory is by itself a good predictor of time to PhD degree; but together these variables are both positively associated with time to degree._
+
+Model:
+
+The new model:
+
+$$
+\begin{align*}
+\text{time to degree} &\sim \text{N}(\mu, \sigma) \\
+\mu &= \alpha + \beta_{f} \cdot \text{funding} + \beta_{s} \cdot \text{lab size} + \beta_{fs} \cdot \text{funding} \cdot \text{lab size}  \\
+\alpha &\sim \text{Normal}(178, 100) \\
+\beta_f &\sim \text{Normal}(0, 10) \\
+\beta_s &\sim \text{Normal}(0, 10) \\
+\beta_fs &\sim \text{Normal}(0, 10) \\
+\sigma &\sim \text{Uniform}(0, 50)
+\end{align*}
+$$
+
+If the hypothesis holds, then:
+
+  1. effect of funding $\beta_f$ should be zero, no slope
+  2. effect of lab size $\beta_s$ should be zero, no slope
+  3. their interaction effect $\beta_{fs}$ should be positive
+
+#### 5E3
+
+1, 3, 4, and 5 are all equivalent.
+
+### Medium
+
+#### 5M1
+
+A spurious correlation, due to holiday season: the number of books a
+person owns causes higher spending on the amount she spends on a
+gift. The hidden explanatory variable is income, which positively
+predicts both variables.
+
+```{r}
+N <- 10000
+
+## simulate an income distribution, using log-normal for non-negatives
+## and a long upper tail
+income <- rlnorm(N, meanlog=log(70e3), sdlog=log(1.5))
+income.z <- (income - mean(income)) / sd(income)
+
+## assume a single gift is usually about half a thousandth of a
+## percent of annual income
+perc_gift <- rbeta(N, 3, 1e4)
+gift_amount <- rlnorm(N, log(perc_gift * income), log(1.2))
+
+## assume number of books owned has a positive correlation with
+## income, because of greater ability to spend and higher education
+## level
+book_mu <- income * rbeta(N, 4, 1e3)
+nbooks <- rnbinom(N, size=1, mu=book_mu)
+plot(log(income), log(nbooks))
+
+gifts <- data.frame(income, gift_amount, nbooks)
+```
+
+Now, we can show that gift price depends on number of books:
+
+```{r}
+gift_fit <- lm(log(gift_amount) ~ log(nbooks + 1), data=gifts)
+summary(gift_fit)
+```
+
+In particular, each e-fold increase in the number of books increases
+the log gift price by `r sprintf("$%.2f", coef(gift_fit)['log(nbooks)'])`. Obviously, the relationship indicates an association, not a causal
+effect.
+
+By including `income` directly, then the relationship with `nbooks` mostly goes away:
+
+```{r}
+gift_fit2 <- lm(log(gift_amount) ~ log(income) + log(nbooks + 1), data=gifts)
+summary(gift_fit2)
+```
+
+```{r}
+gift_fit_map2 <- rethinking::map(
+  alist(
+    log(gift_amount) ~ dnorm(mu, sigma),
+    mu <- a + bi * log(income) + bb * log(nbooks + 1),
+    a ~ dnorm(0, 5),
+    bi ~ dnorm(0, 1),
+    bb ~ dnorm(0, 1),
+    sigma ~ dunif(0, 100))
+  , data=as.data.frame(gifts))
+precis(gift_fit_map2)
+```
+
+### 5M2
+
+Simulate masked relationship:
+
+  * Country GDP is a positive predictor of average family income
+  * TV watched per day is a negative predictor of average family
+    income. Poorer, less educated people tend to watch more TV.
+  * However, country GDP has positive correlation with TV minutes
+    watched per day, because TV requires relative wealth and
+    infrastructure.
+  * Thus, _across countries_ income positively correlates with TV
+    watched. However, _within one country wealth category_, the
+    negative correlation of TV and income is evident.
+
+```{r}
+N <- 10000
+gdp <- rlnorm(N, meanlog=10, sdlog=.5)   # country gdp
+tv_mins <- rgamma(N, gdp/0.5e3, scale=2) # minutes of TV per day
+income.log <- rnorm(N, -0.4*log(tv_mins) + 0.6*log(gdp)) # family income
+income <- exp(income.log)
+df <- data.frame(gdp, tv_mins, income.log, income)
+
+par(mfrow=c(1, 2))
+plot(log(gdp), log(income))
+plot(log(tv_mins), log(income))
+par(mfrow=c(1,1))
+```
+
+```{r}
+tv_fit <- map(
+  alist(
+    income.log ~ dnorm(mu, sigma),
+    mu <- a + bt*log(tv_mins),
+    a ~ dnorm(1, 10),
+    bt ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ), data=df
+)
+precis(tv_fit)
+```
+```{r}
+gdp_fit <- map(
+  alist(
+    income.log ~ dnorm(mu, sigma),
+    mu <- a + bg*log(gdp),
+    a ~ dnorm(1, 10),
+    bg ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ), data=df
+)
+precis(gdp_fit)
+```
+
+```{r}
+full_fit <- map(
+  alist(
+    income.log ~ dnorm(mu, sigma),
+    mu <- a + bt*log(tv_mins) + bg*log(gdp),
+    a ~ dnorm(1, 5),
+    bt ~ dnorm(0, 10),
+    bg ~ dnorm(0, 10),
+    sigma ~ dunif(0, 10)
+  ), data=df)
+precis(full_fit)
+```
