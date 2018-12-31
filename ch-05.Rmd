@@ -11,7 +11,7 @@ d <- WaffleDivorce
 d$MedianAgeMarriage.s <- (d$MedianAgeMarriage-mean(d$MedianAgeMarriage)) / sd(d$MedianAgeMarriage)
 
 # fit model
-m5.1 <- map(
+m5.1 <- rethinking::map(
   alist(
     Divorce ~ dnorm(mu, sigma),
     mu <- a + bA * MedianAgeMarriage.s,
@@ -28,7 +28,7 @@ mu <- link(m5.1, data=data.frame(MedianAgeMarriage.s=MAM.seq))
 mu.PI <- apply(mu, 2, PI)
 
 # plot it all
-plot(Divorce ~ MedianAgeMarriage.s, data=d, col=rangi2)
+plot(Divorce ~ MedianAgeMarriage.s, data=d, col="steelblue4")
 abline(m5.1)
 shade(mu.PI, MAM.seq)
 ```
@@ -37,7 +37,7 @@ Divorce rate vs marriage rate
 
 ```{r 5.3}
 d$Marriage.s <- (d$Marriage - mean(d$Marriage)) / sd(d$Marriage)
-m5.2 <- map(
+m5.2 <- rethinking::map(
   alist(
     Divorce ~ dnorm(mu, sigma),
     mu <- a + bR * Marriage.s,
@@ -51,7 +51,7 @@ m5.2 <- map(
 # Multiple regression
 
 ```{r 5.4}
-m5.3 <- map(
+m5.3 <- rethinking::map(
   alist(
     Divorce ~ dnorm(mu, sigma),
     mu <- a + bR*Marriage.s + bA*MedianAgeMarriage.s,
@@ -78,7 +78,7 @@ Age of marriage has a negative correlation. Rate of marriage does not add predic
 1) Use one predictor to model the other. e.g. use age to model marriage rate
 
 ```{r 5.6}
-m5.4 <- map(
+m5.4 <- rethinking::map(
   alist(
     Marriage.s ~ dnorm(mu, sigma),
     mu <- a + b*MedianAgeMarriage.s,
@@ -101,7 +101,7 @@ m.resid <- d$Marriage.s - mu
 3) Plot marriage rate against age
 
 ```{r 5.8}
-plot(Marriage.s ~ MedianAgeMarriage.s, d, col=rangi2)
+plot(Marriage.s ~ MedianAgeMarriage.s, d, col="steelblue4")
 abline(m5.4)
 # draw residuals, loop over States
 for (i in 1:length(m.resid)) {
@@ -117,7 +117,7 @@ Plot residuals against outcome (figure 5.4)
 ```{r}
 par(mfrow=c(1,2))
 
-plot(Divorce ~ m.resid, d, col=rangi2,
+plot(Divorce ~ m.resid, d, col="steelblue4",
      xlab='Marriage rate residuals',
      ylab='Divorce rate',
      ylim=c(6, 15))
@@ -127,7 +127,7 @@ names(extents) <- c('xmin', 'xmax', 'ymin', 'ymax')
 text(x=-0, y=extents['ymax']-0.3, 'slower', pos=2)
 text(x=-0, y=extents['ymax']-0.3, 'faster', pos=4)
 
-m5.4b <- map(
+m5.4b <- rethinking::map(
   alist(
     Divorce ~ dnorm(mu, sigma),
     mu <- a + b*m.resid,
@@ -145,7 +145,7 @@ lines(resid.seq, mu.mean)
 shade(mu.PI, resid.seq)
 
 ## age residuals
-m5.4c <- map(
+m5.4c <- rethinking::map(
   alist(
     MedianAgeMarriage.s ~ dnorm(mu, sigma),
     mu <- a + b*Marriage.s,
@@ -158,7 +158,7 @@ m5.4c <- map(
 a.mu <- coef(m5.4c)['a'] + coef(m5.4c)['b'] * d$Marriage.s
 a.resid <- d$MedianAgeMarriage.s - a.mu
 
-m5.4d <- map(
+m5.4d <- rethinking::map(
   alist(
     Divorce ~ dnorm(mu, sigma),
     mu <- a + b*a.resid,
@@ -168,7 +168,7 @@ m5.4d <- map(
   )
 , data=d)
 
-plot(Divorce ~ a.resid, data=d, col=rangi2,
+plot(Divorce ~ a.resid, data=d, col="steelblue4",
      xlab='Age of marriage residuals',
      ylab='Divorce rate',
      ylim=c(6, 15))
@@ -281,7 +281,7 @@ plot(mu.mean ~ d$Divorce, col=rangi2, ylim=range(mu.PI),
 abline(a=0, b=1, lty=2)
 for (i in 1:nrow(d))
   lines(rep(d$Divorce[i],2), c(mu.PI[1,i], mu.PI[2, i]),
-        col=rangi2)
+        col="steelblue4")
 ```
 
 label a few points. gives point and click interface
@@ -311,9 +311,9 @@ for (i in 1:nrow(d)) {
 ```{r}
 # make figure 5.6c
 pcap <- d$WaffleHouses/d$Population
-plot(divorce.resid ~ pcap, col=rangi2)
+plot(divorce.resid ~ pcap, col="steelblue4")
 
-m5.4e <- map(
+m5.4e <- rethinking::map(
   alist(
     divorce.resid ~ dnorm(mu, sigma),
     mu <- a + b*pcap,
@@ -332,7 +332,7 @@ shade(mu.PI, x)
 ```
 
 ```{r}
-par(def.par) # reset to default
+dev.off() # reset par to default
 ```
 
 
@@ -347,9 +347,9 @@ d <- milk
 str(d)
 ```
 
-```{r 5.17}
+```{r 5.17, error=TRUE}
 # will throw error b/c of NA values
-m5.5 <- map(
+m5.5 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bn*neocortex.perc,
@@ -366,7 +366,7 @@ dcc <- d[complete.cases(d),]
 ```
 
 ```{r 5.20}
-m5.5 <- map(
+m5.5 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bn*neocortex.perc,
@@ -400,7 +400,7 @@ mu.mean <- apply(mu, 2, mean)
 mu.PI <- apply(mu, 2, PI)
 
 par(mfrow=c(2,2))
-plot(kcal.per.g ~ neocortex.perc, data=dcc, col=rangi2)
+plot(kcal.per.g ~ neocortex.perc, data=dcc, col="steelblue4")
 lines(np.seq, mu.mean)
 lines(np.seq, mu.PI[1,], lty=2)
 lines(np.seq, mu.PI[2,], lty=2)
@@ -411,7 +411,7 @@ dcc$log.mass <- log(dcc$mass)
 ```
 
 ```{r 5.25}
-m5.6 <- map(
+m5.6 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bm*log.mass,
@@ -434,7 +434,7 @@ mu <- link(m5.6, data=pred.data, n=1e4)
 mu.mean <- apply(mu, 2, mean)
 mu.PI <- apply(mu, 2, PI)
 
-plot(kcal.per.g ~ log.mass, data=dcc, col=rangi2)
+plot(kcal.per.g ~ log.mass, data=dcc, col="steelblue4")
 lines(lm.seq, mu.mean)
 lines(lm.seq, mu.PI[1,], lty=2)
 lines(lm.seq, mu.PI[2,], lty=2)
@@ -443,7 +443,7 @@ lines(lm.seq, mu.PI[2,], lty=2)
 Now, both neocortex and log.mass together
 
 ```{r 5.26}
-m5.7 <- map(
+m5.7 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bn*neocortex.perc + bm*log.mass,
@@ -452,7 +452,7 @@ m5.7 <- map(
     bm ~ dnorm(0, 1),
     sigma ~ dunif(0, 1)
   ),
-data=dcc)
+  data=dcc)
 precis(m5.7)
 ```
 
@@ -495,7 +495,7 @@ lines(lm.seq, mu.PI[2,], lty=2)
 ```
 
 ```{r}
-par(def.par)
+dev.off() # reset par()
 ```
 
 ## When adding variables hurts
@@ -523,7 +523,7 @@ d <- data.frame(height, leg_left, leg_right)
 ```
 
 ```{r 5.30}
-m5.8 <- map(
+m5.8 <- rethinking::map(
   alist(
     height ~ dnorm(mu, sigma),
     mu <- a + bl*leg_left + br*leg_right,
@@ -544,7 +544,7 @@ plot(precis(m5.8))
 
 ```{r 5.32}
 post <- extract.samples(m5.8)
-plot(bl ~ br, post, col=col.alpha(rangi2, 0.1), pch=16)
+plot(bl ~ br, post, col=col.alpha("steelblue4", 0.1), pch=16)
 ```
 
 Model uses two coefficients for, essentially, one variable (here, leg length), so
@@ -555,13 +555,13 @@ So the sum of the coefficients provides the estimate, but a nearly infinite comb
 
 ```{r 5.33}
 sum_blbr <- post$bl + post$br
-dens(sum_blbr, col=rangi2, lwd=2, xlab="sum of bl and br")
+dens(sum_blbr, col="steelblue4", lwd=2, xlab="sum of bl and br")
 ```
 
 Fit with only one leg length. Here the coefficient is close to the sum of the two coefficients in the last model.
 
 ```{r 5.34}
-m5.9 <- map(
+m5.9 <- rethinking::map(
   alist(
     height ~ dnorm(mu, sigma),
     mu <- a + bl*leg_left,
@@ -584,7 +584,7 @@ Start with two independent regressions on fat and lactose
 
 ```{r 5.36}
 # kcal.per.g regressed on perc.fat
-m5.10 <- map(
+m5.10 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bf*perc.fat,
@@ -595,7 +595,7 @@ m5.10 <- map(
   data=d)
 
 # kcal.per.g regressed on perc.lactose
-m5.11 <- map(
+m5.11 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bl*perc.lactose,
@@ -612,7 +612,7 @@ precis(m5.11, digits=3)
 Associations look worse when both variables are included in one model, because they are so highly correlated with each other (they carry the same information).
 
 ```{r 5.37}
-m5.12 <- map(
+m5.12 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + bf*perc.fat + bl*perc.lactose,
@@ -627,7 +627,7 @@ precis(m5.12, digits=3)
 
 ```{r 5.38}
 pairs( ~ kcal.per.g + perc.fat + perc.lactose,
-      data=d, col=rangi2)
+      data=d, col="steelblue4")
 ```
 
 ```{r 5.39}
@@ -652,7 +652,7 @@ rep.sim.coll <- function(r=0.9, n=100) {
 }
 r.seq <- seq(from=0, to=0.99, by=0.01)
 stddev <- sapply(r.seq, function(z) rep.sim.coll(r=z, n=100))
-plot(stddev ~ r.seq, type="l", col=rangi2, lwd=2, xlab="correlation")
+plot(stddev ~ r.seq, type="l", col="steelblue4", lwd=2, xlab="correlation")
 ```
 
 ## Post-treatment bias
@@ -683,11 +683,11 @@ d <- data.frame(h0=h0, h1=h1, treatment=treatment, fungus=fungus)
 ```
 
 ```{r 5.42}
-m5.13 <- map(
+m5.13 <- rethinking::map(
   alist(
     h1 ~ dnorm(mu, sigma),
     mu <- a + bh*h0 + bt*treatment + bf*fungus,
-    a ~ dnorm(0, 100),
+    a ~ dnorm(0, 10),
     c(bh, bt, bf) ~ dnorm(0, 10),
     sigma ~ dunif(0, 10)
   ),
@@ -704,8 +704,8 @@ from `treatment`.
 
 This time omit the `fungus` variable
 
-```{r 5.43}
-m5.14 <- map(
+```{r 5.43, error=TRUE}
+m5.14 <- rethinking::map(
   alist(
     h1 ~ dnorm(mu, sigma),
     mu <- a + bh*h0 + bt*treatment,
@@ -732,7 +732,7 @@ str(d)
 Measure effect of being `male` on height:
 
 ```{r 5.45}
-m5.15 <- map(
+m5.15 <- rethinking::map(
   alist(
     height ~ dnorm(mu, sigma),
     mu <- a + bm*male,
@@ -759,7 +759,7 @@ PI(mu.male)
 Instructive to show that the same model can follow different math. Now `af` is the average female height and `am` is the average male height.
 
 ```{r 5.47}
-m5.15b <- map(
+m5.15b <- rethinking::map(
   alist(
     height ~ dnorm(mu, sigma),
     mu <- af*(1-male) + am*male,
@@ -792,7 +792,7 @@ d$clade.S <- ifelse(d$clade == "Strepsirrhine", 1, 0)
 ```
 
 ```{r 5.51}
-m5.16 <- map(
+m5.16 <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a + b.NWM*clade.NWM + b.OWM*clade.OWM + b.S*clade.S,
@@ -811,7 +811,7 @@ Removing the intercept and including a coefficient for ape mean `b.ape` also wor
 ```{r}
 d$clade.ape <- ifelse(d$clade == "Ape", 1, 0)
 
-m5.16b <- map(
+m5.16b <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- b.ape*clade.ape + b.NWM*clade.NWM + b.OWM*clade.OWM + b.S*clade.S,
@@ -857,7 +857,7 @@ Create an index variable to indicate which group each sample belongs to.
 ```
 
 ```{r 5.55}
-m5.16_alt <- map(
+m5.16_alt <- rethinking::map(
   alist(
     kcal.per.g ~ dnorm(mu, sigma),
     mu <- a[clade_id],            # one mean for each clade id
@@ -1014,7 +1014,7 @@ par(mfrow=c(1,1))
 ```
 
 ```{r}
-tv_fit <- map(
+tv_fit <- rethinking::map(
   alist(
     income.log ~ dnorm(mu, sigma),
     mu <- a + bt*log(tv_mins),
@@ -1026,7 +1026,7 @@ tv_fit <- map(
 precis(tv_fit)
 ```
 ```{r}
-gdp_fit <- map(
+gdp_fit <- rethinking::map(
   alist(
     income.log ~ dnorm(mu, sigma),
     mu <- a + bg*log(gdp),
@@ -1039,7 +1039,7 @@ precis(gdp_fit)
 ```
 
 ```{r}
-full_fit <- map(
+full_fit <- rethinking::map(
   alist(
     income.log ~ dnorm(mu, sigma),
     mu <- a + bt*log(tv_mins) + bg*log(gdp),
@@ -1050,3 +1050,336 @@ full_fit <- map(
   ), data=df)
 precis(full_fit)
 ```
+
+### 5M3
+
+High divorce rate may create a larger pool of unmarried people,
+especially those who are (were?) interested in marriage. Data on the
+rate of second marriages and multiple marriages would test that
+relationship.
+
+Given the data at hand, one suggestive model may be to predict _median
+age of marriage_ jointly by _marriage rate_ and _divorce rate_. That
+is, `MedianAgeMarriage ~ Marriage + Divorce`.
+
+This would help separate the correlation between marriage rate and
+divorce rate somewhat. In this model, a positive relationship with
+divorce rate and median age of marriage would suggest that, although
+on its own divorce rate is higher due to young marriage, when marriage
+rate is already known, a higher divorce rate predicts a higher age of
+marriage because post-divorce marriages happen later in life.
+
+### 5M4
+
+```{r}
+library(rvest)
+library(tidyverse)
+
+url <- "https://www.worldatlas.com/articles/mormon-population-by-state.html"
+mormon_atlas <- read_html(url)
+
+tbl <- mormon_atlas %>%
+  html_node("table") %>%
+  html_table %>%
+  as.tibble
+```
+
+```{r}
+library(janitor)
+library(rethinking)
+data(WaffleDivorce)
+
+colnames(tbl) <- str_to_lower(colnames(tbl))
+tbl_clean <- tbl %>%
+  clean_names %>%
+  transmute(
+    Location   = state,
+    MormonPop  = (estimated_mormon_population %>% parse_number) / 1e6,
+    TotalPop   = (total_state_population %>% parse_number) / 1e6,
+    MormonPerc = (percentage_of_mormon_residents %>% parse_number))
+
+d <- WaffleDivorce %>%
+  left_join(tbl_clean, by='Location') %>%
+  mutate(Marriage.s = scale(Marriage),
+         MedianAgeMarriage.s = scale(MedianAgeMarriage))
+```
+
+```{r}
+m5m4.1 <- rethinking::map(
+  alist(
+    Marriage.s ~ dnorm(mu, sigma),
+    mu <- a + bmor*log(MormonPerc),
+    a ~ dnorm(0, 10),
+    bmor ~ dnorm(0, 5),
+    sigma ~ dunif(0, 20)
+  ),
+  data=d)
+```
+
+```{r}
+precis(m5m4.1)
+
+x <- seq(min(d$MormonPerc), max(d$MormonPerc), length.out=30)
+pred.data <- data.frame(MormonPerc=x)
+
+mu <- link(m5m4.1, data=pred.data, n=1e3)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+plot(Marriage.s ~ log(MormonPerc), data=d, col="steelblue4")
+lines(log(x), mu.mean, type='l')
+shade(mu.PI, log(x))
+```
+
+```{r}
+m5m4.2 <- rethinking::map(
+  alist(
+    Divorce ~ dnorm(mu, sigma),
+    mu <- a + bm*Marriage + ba*MedianAgeMarriage + bmor*log(MormonPerc),
+    a ~ dnorm(0, 10),
+    c(bm, ba, bmor) ~ dnorm(0, 5),
+    sigma ~ dunif(0, 20)
+  ),
+  data=d)
+```
+
+Plot residual
+
+```{r}
+m5m4.3 <- rethinking::map(
+  alist(
+    log(MormonPerc) ~ dnorm(mu, sigma),
+    mu <- a + ba*MedianAgeMarriage.s + bm*Marriage.s,
+    a ~ dnorm(0, 10),
+    c(ba, bm) ~ dnorm(0, 2),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+
+#resid.seq <- seq(-10, 10, length.out=50)
+mu <- link(m5m4.3, data=d[,c('MedianAgeMarriage.s', 'Marriage.s')])
+mu.mean <- apply(mu, 2, mean)
+mp.resid <- log(d$MormonPerc) - mu.mean
+plot(mp.resid, d$Divorce,
+     xlab="log(% Mormon) Residuals",
+     ylab="Divorce Rate",
+     col='steelblue4')
+abline(v=0, lty='dashed')
+```
+
+### 5M5
+
+$\mathrm{obesity rate} \sim \mathrm{gas price} + \mathrm{miles driving} + \mathrm{exercise} + \mathrm{restaurant visits}$
+
+## Hard
+
+```{r}
+data(foxes)
+d <- foxes
+```
+
+### 5H1
+
+Weight by territory
+
+```{r}
+m5h1.1 <- rethinking::map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bt * area,
+    a ~ dnorm(6, 2),
+    bt ~ dnorm(0, 2),
+    sigma ~ dunif(0, 50)
+  ),
+  data=d)
+
+precis(m5h1.1)
+```
+
+```{r}
+area.seq <- seq(min(d$area), max(d$area), length.out=50)
+pred.data <- data.frame(area=area.seq)
+mu <- link(m5h1.1, data=pred.data)
+
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI, prob=0.95)
+
+par(mfrow=c(1, 2))
+plot(weight ~ area, data=d,
+     xlab="Area", ylab="Weight",
+     col="steelblue4")
+lines(area.seq, mu.mean)
+shade(mu.PI, area.seq)
+```
+
+Weight by group size
+
+```{r}
+m5h1.2 <- rethinking::map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bg * groupsize,
+    a ~ dnorm(0, 2),
+    bg ~ dnorm(0, 5),
+    sigma ~ dunif(0, 10)
+  ),
+  data=d)
+
+precis(m5h1.2)
+```
+
+```{r}
+groupsize.seq <- seq(min(d$groupsize), max(d$groupsize), length.out=50)
+pred.data <- data.frame(groupsize=groupsize.seq)
+mu <- link(m5h1.2, data=pred.data)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI, prob=0.95)
+
+plot(weight ~ groupsize, data=d,
+     col="steelblue4",
+     xlab="Group Size",
+     ylab="Weight")
+lines(mu.mean ~ groupsize.seq, data=d)
+shade(mu.PI, groupsize.seq)
+```
+
+Group size has a very minor negative effect on weight, but it is very
+small and the estimate is influenced by a small sample at the largest
+group size (size=8).
+
+### 5H2
+
+```{r}
+m5h2.1 <- rethinking::map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bt * area + bg * groupsize,
+    a ~ dnorm(0, 5),
+    c(bt, bg) ~ dnorm(0, 4),
+    sigma ~ dunif(0, 20)
+  ),
+  data=d)
+
+precis(m5h2.1)
+```
+
+The multiple regression has uncovered a larger effect for both area
+and group size.
+
+This is because area and group size mask the effects of each
+other. They are correlated with each other, but have opposing effects
+on the fox's weight (group size negatively influences weight, area
+positively influences weight).
+
+```{r}
+par(mfrow=c(1,3))
+plot(groupsize ~ area, data=d,
+     xlab="Area", ylab="Group Size")
+
+## counterfactual for area
+area.seq <- seq(from=min(d$area), to=max(d$area), length.out=30)
+pred.data <- data.frame(
+  area=area.seq,
+  groupsize=mean(d$groupsize)
+)
+
+mu <- link(m5h2.1, data=pred.data)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+area.sim <- sim(m5h2.1, data=pred.data, n=1e4)
+area.PI <- apply(area.sim, 2, PI)
+
+plot(weight ~ area, data=d, type='n',
+     xlab='Area', ylab='Weight')
+mtext('Counterfactual at mean groupsize')
+lines(area.seq, mu.mean)
+shade(mu.PI, area.seq)
+shade(area.PI, area.seq)
+
+## counterfactual for groupsize
+gs.seq <- seq(min(d$groupsize), max(d$groupsize), length.out=30)
+pred.data <- data.frame(
+  area=mean(d$area),
+  groupsize=gs.seq
+)
+
+mu <- link(m5h2.1, data=pred.data)
+mu.mean <- apply(mu, 2, mean)
+mu.PI <- apply(mu, 2, PI)
+
+gs.sim <- sim(m5h2.1, data=pred.data, n=1e4)
+gs.PI <- apply(gs.sim, 2, PI)
+
+plot(weight ~ groupsize, data=d, type='n',
+     xlab='Group Size', ylab='Weight')
+mtext("Counterfactual at mean area")
+lines(gs.seq, mu.mean)
+shade(mu.PI, gs.seq)
+shade(gs.PI, gs.seq)
+```
+
+### 5H3
+
+```{r}
+d$area.s <- scale(d$area)
+d$avgfood.s <- scale(d$avgfood)
+d$groupsize.s <- scale(d$groupsize)
+
+m5h3.1 <- rethinking::map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bfood * avgfood.s + bgrps * groupsize.s + barea * area.s,
+    a ~ dnorm(0, 5),
+    c(bfood, bgrps, barea) ~ dnorm(0, 10),
+    sigma ~ dunif(0, 20)
+  ),
+  data=d)
+precis(m5h3.1)
+
+m5h3.2 <- rethinking::map(
+  alist(
+    weight ~ dnorm(mu, sigma),
+    mu <- a + bgrps * groupsize.s + barea * area.s,
+    a ~ dnorm(0, 5),
+    c(bgrps, barea) ~ dnorm(0, 10),
+    sigma ~ dunif(0, 20)
+  ),
+  data=d)
+precis(m5h3.2)
+```
+
+Adding `food` as a predictor reduces the influence of both `groupsize`
+and `area` as predictors compared with the previous model. Here, for
+comparison, the bivariate model is reproduced with standardized
+variables.
+
+  a. `avgfood` appears to be a stronger predictor than `area`:
+
+```{r}
+par(mfrow=c(1, 2))
+plot(precis(m5h3.1))
+```
+
+where the food coefficient `bfood` is more positive than the area
+coefficient `barea`, although barely so.
+
+A better evalution would be to develop a posterior distribution of the
+difference between `bfood` and `barea`:
+
+```{r}
+post <- extract.samples(m5h3.1, n=1e5)
+diff <- with(post, bfood - barea)
+
+dens(diff, col="steelblue4")
+mtext("bfood - barea")
+abline(v=0, lty=2, col=col.alpha('black', 0.2))
+```
+
+The posterior mean for the difference is slightly positive (`r mean(diff)`), but the predictive interval is wide (`r PI(diff, prob=0.95)`).  So given the information at hand, `avgfood` is the better
+predictor, but that conclusion is very uncertain.
+
+On the other hand, the biology makes good sense that availbility of
+food has a strong and direct effect on weight. Whereas, territorial
+area also has an effect, but some of it is mediated through food
+availability.
