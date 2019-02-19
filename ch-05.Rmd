@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 # Statistical Rethinking, Chapter 5 Multivariate models
 
 Fit and plot divorce rate vs median age of marriage (standardized):

@@ -1,0 +1,235 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r echo=FALSE}
+library(rethinking)
+library(tidyverse)
+```
+
+```{r 6.1}
+sppnames <- c("afarensis", "africanus", "habilis", "boisei",
+              "rudolfensis", "ergaster", "sapiens")
+brainvolcc <- c(438, 452, 612, 521, 752, 871, 1350)
+masskg <- c(37.0, 35.5, 34.5, 41.5, 55.5, 61.0, 53.5)
+d <- data.frame(species=sppnames, brain=brainvolcc, mass=masskg)
+```
+
+```{r 6.2}
+m6.1 <- lm(brain ~ mass, data=d)
+```
+
+```{r 6.3}
+1 - var(resid(m6.1))/var(d$brain)
+```
+
+```{r 6.4}
+m6.2 <- lm(brain ~ mass + I(mass^2), data=d)
+```
+
+```{r 6.5}
+m6.3 <- lm(brain ~ mass + I(mass^2) + I(mass^3), data=d)
+m6.4 <- lm(brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4), data=d)
+m6.5 <- lm(brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4) +
+           I(mass^5), data=d)
+m6.6 <- lm(brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4) +
+           I(mass^5) + I(mass^6), data=d)
+```
+
+```{r fig-6.3, echo=FALSE}
+mass.seq <- seq(30, 65, length.out=50)
+r2 <- function(fit) { 1 - var(resid(fit)) / var(d$brain) }
+
+par(mfrow=c(3,2))
+for (fit in list(m6.1, m6.2, m6.3, m6.4, m6.5, m6.6)) {
+  print(fit)
+  p <- predict(object=fit, newdata=data.frame(mass=mass.seq),
+               interval="confidence", level=0.89)
+  plot(brain ~ mass, data=d, col='steelblue4',
+       xlab='body mass (kg)', ylab='brain volume (cc)',
+       ylim=c(350, 1500))
+  mtext(paste(expression(R^2), sprintf('= %.2f', r2(fit))))
+  lines(mass.seq, p[,'fit'])
+  shade(t(p[,-1]), mass.seq)
+}
+```
+
+```{r 6.6}
+m6.7 <- lm(brain ~ 1, data=d)
+```
+
+```{r fig6.4, echo=FALSE}
+plot(brain ~ mass, data=d, col='steelblue4',
+     xlab='body mass (kg)', ylab='brain volume (cc)',
+     ylim=c(350, 1500))
+
+mtext(paste(expression(R^2), sprintf('= %.2f', r2(m6.7))))
+p <- predict(object=m6.7, newdata=data.frame(mass=mass.seq),
+             interval="confidence", level=0.89)
+lines(mass.seq, p[,'fit'])
+shade(t(p[,-1]), mass.seq)
+```
+
+```{r fig6.5, echo=FALSE}
+par(mfrow=c(1, 2))
+mass.seq <- seq(30, 65, length.out=100)
+
+plot(brain ~ mass, data=d, col='steelblue4', ylim=c(350, 1500))
+for (i in 1:nrow(d)) {
+  d.new <- d[-i,]
+  m0 <- lm(brain ~ mass, d.new)
+  lines(mass.seq, predict(m0, data.frame(mass=mass.seq)), col=col.alpha("black", 0.5))
+}
+
+plot(brain ~ mass, data=d, col='steelblue4', ylim=c(-200, 2200))
+for (i in 1:nrow(d)) {
+  d.new <- d[-i,]
+  m0 <- lm(brain ~ mass + I(mass^2) + I(mass^3) + I(mass^4) + I(mass^5), d.new)
+  lines(mass.seq, predict(m0, data.frame(mass=mass.seq)), col=col.alpha("black", 0.5))
+}
+
+par(mfrow=c(1,1))
+```
+
+### Information Theory
+
+information
+:    the reduction in uncertainty derived from learning an outcome
+
+information entropy (uncertainty)
+:    the uncertainty contained in a probability distribution is the
+     average log-probability of an event.
+
+$$
+H(p) = -\mathrm{E}\,\log(p_i) = - \sum_{i=1}^n{p_i \log(p_i)}
+$$
+
+```{r 6.9}
+p <- c(0.3, 0.7)
+-sum(p * log(p))
+```
+
+Kullback-Leibler divergence
+:    additional uncertainty induced by using probabilities from one
+     distribution to describe another distribution
+
+:    average difference in log probability between the target ($p$) and model ($q$)
+
+$$
+D_{\mathrm{KL}}(p, q) = \sum_i{ p_i \left( \log{(p_i)} - \log{(q_i)} \right) } = \sum_i { p_i \log{\left(\frac{p_i}{q_i} \right) } }
+$$
+
+
+### Model comparison
+
+```{r 6.21}
+data(milk)
+d <- milk[complete.cases(milk),]
+d$neocortex <- d$neocortex.perc / 100
+dim(d)
+```
+
+```{r 6.22}
+a.start <- mean(d$kcal.per.g)
+sigma.start <- log(sd(d$kcal.per.g))
+m6.11 <- rethinking::map(
+  alist(
+    kcal.per.g ~ dnorm(a, exp(log.sigma))
+  ),
+  data=d, start=list(a=a.start,
+                     log.sigma=sigma.start))
+
+m6.12 <- rethinking::map(
+  alist(
+    kcal.per.g ~ dnorm(mu, exp(log.sigma)),
+    mu <- a + bn*neocortex
+  ),
+  data=d, start=list(a=a.start,
+                     bn=0,
+                     log.sigma=sigma.start))
+
+m6.13 <- rethinking::map(
+  alist(
+    kcal.per.g ~ dnorm(mu, exp(log.sigma)),
+    mu <- a + bm*log(mass)
+  ),
+  data=d, start=list(a=a.start,
+                     bm=0,
+                     log.sigma=sigma.start))
+
+m6.14 <- rethinking::map(
+  alist(
+    kcal.per.g ~ dnorm(mu, exp(log.sigma)),
+    mu <- a + bn*neocortex + bm*log(mass)
+  ),
+  data=d, start=list(a=a.start,
+                     bn=0,
+                     bm=0,
+                     log.sigma=sigma.start))
+```
+
+```{r 6.23}
+w <- WAIC(m6.14)
+w
+
+## calc WAIC
+-2 * (attr(w, 'lppd') - attr(w, 'pWAIC'))
+```
+
+```{r 6.24}
+milk.models <- rethinking::compare(m6.11, m6.12, m6.13, m6.14)
+```
+
+```{r 6.25}
+plot(milk.models, SE=TRUE, dSE=TRUE)
+```
+
+```{r 6.27}
+coeftab(m6.11, m6.12, m6.13, m6.14)
+```
+
+```{r 6.28}
+plot(coeftab(m6.11, m6.12, m6.13, m6.14))
+```
+
+# Exercises
+
+## Easy
+
+### 6E1
+
+Information entropy
+
+1) entropy is continuous. small changes in the probability of the
+outcomes lead to small changes in uncertainty. uncertainty varies
+smoothly, with no jumps.
+
+2) with more possible outcomes/messages, entropy/uncertainty is higher
+(and more is learned when one outcome is chosen).
+
+3) the uncertainties of two independent events happening separately is
+equal to the uncertainty of both events happening together.
+
+### 6E2
+
+```{r}
+events <- c('heads'=0.7, 'tails'=0.3)
+-sum(events * log(events))
+```
+
+### 6E3
+
+```{r}
+events <- c(0.2, 0.25, 0.25, 0.30)
+names(events) <- 1:4
+-sum(events * log(events))
+```
+
+### 6E4
+
+```{r}
+events <- c(1/3, 1/3, 1/3)
+names(events) <- 1:3
+-sum(events * log(events))
+```
