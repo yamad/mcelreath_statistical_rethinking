@@ -233,3 +233,198 @@ events <- c(1/3, 1/3, 1/3)
 names(events) <- 1:3
 -sum(events * log(events))
 ```
+
+## Medium
+
+### 6M1
+
+#### Akaike Information Criterion (AIC)
+
+$$
+\mathrm{AIC} = D_{train} + 2p
+$$
+
+for number of parameters $p$ and in-sample deviance $D_{train}$.
+
+Recall, Deviance $D(q)$ of probability distribution $q$ is defined by
+
+$$
+D(q) = -2 \sum_{i}{\log{(q_i)}}
+$$
+
+Assumptions:
+
+  1) flat priors
+  2) Gaussian posterior
+  3) sample size $N >> k$ parameters
+
+#### DIC (Deviance Information Criterion)
+
+$$
+DIC = \bar{D} + (\bar{D} - \hat{D}) = \bar{D} + p_D
+$$
+
+for average posterior deviance $\bar{D}$ and posterior mean deviance
+$\hat{D}$. Notice, $p_D = $\bar{D} - \hat{D}$ and represents an
+_effective number of parameters$.
+
+  1) _non-flat priors_
+  2) Gaussian posterior
+  3) $N >> k$
+
+#### WAIC (Widely Applicable Information Criterion)
+
+  1) _non-flat priors_
+  2) _non-Gaussian posterior_
+  3) calculated pointwise, at each observation
+  4) not meaningful if observations are not independent
+
+$$
+WAIC = -2(\mathrm{lppd} - p_{WAIC})
+$$
+
+log-posterior predictive density:
+
+$$
+lppd = \sum_{i=1}^{N}{\log{\mathrm{Pr}(y_i)}}
+$$
+
+
+$$
+p_{WAIC} = \sum_{i=1}^{N}{V(y_i)}
+$$
+
+
+#### Summary
+
+WAIC is the most general in the sense that there are no assumptions
+about the shape of the probability distributions, either for the prior
+or posterior. Assuming a Gaussian posterior leads to DIC, and
+additionally assuming Gaussian priors leads to AIC.
+
+### 6M2
+
+Model selection chooses one model, considered "best" by some criterion (possibly information criteria like WAIC). Model selection discards information about relative accuracy between models. This information can be used to evaluate confidence in the model structure.
+
+
+Model averaging uses all models in each prediction, in a sort of weighted averaging of each individual model's prediction. It incorporates relative accuracy between models into one posterior predictive distribution.
+
+There will be higher uncertainty from model averaging about the model itself and model predictions than a single model will. The estimates are conditional on the set of models considered. If many bad models are included, then uncertainty could be inflated even if a very good true model is among the set of models.
+
+
+### 6M3
+
+IC and deviance values will (almost?) always be lower with fewer observations. The model "has been asked to predict less". Note from the calculation of deviance: it is not an average, it is a sum and thus is sensitive to changes in sample size.
+
+### 6M4
+
+Regularization constrains model flexibility which is reflected as a lower number of effective parameters as the regularizing prior gets stronger (more concentrated).
+
+### 6M5
+
+An informative prior is like adding many samples from previously collected data, thus reducing the influence of the sampling peculiarities of the current data.
+
+### 6M6
+
+Overly informative priors don't incorporate new evidence easily, because the belief is very strong and concentrated already. New evidence that falls outside of a narrow region is given very low probability.
+
+
+## Hard
+
+```{r}
+library(rethinking)
+data(Howell1)
+d <- Howell1
+d$age <- (d$age - mean(d$age)) / sd(d$age)
+set.seed(1000)
+i <- sample(1:nrow(d), size=nrow(d)/2)
+d1 <- d[i,]
+d2 <- d[-i,]
+```
+
+```{r}
+height.start <- mean(d1$height)
+m6h1.1 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age,
+        a <- dnorm(0, 10),
+        b1 <- dnorm(0, 10),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+m6h1.2 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age + b2*age^2,
+        a <- dnorm(0, 10),
+        c(b1, b2) <- dnorm(0, 10),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+m6h1.3 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age + b2*age^2 + b3*age^3,
+        a <- dnorm(0, 10),
+        c(b1, b2, b3) <- dnorm(0, 10),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+m6h1.4 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4,
+        a <- dnorm(0, 10),
+        c(b1, b2, b3, b4) <- dnorm(0, 10),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+m6h1.5 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4 + b5*age^5,
+        a <- dnorm(0, 10),
+        c(b1, b2, b3, b4, b5) <- dnorm(0, 10),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+m6h1.6 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4 + b5*age^5 + b6*age^6,
+        a <- dnorm(0, 10),
+        c(b1, b2, b3, b4, b5, b6) <- dnorm(0, 10),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+
+m6h1.models <- paste0("m6h1.", 1:6)
+```
+
+### 6H1
+
+```{r}
+compare_ <- do.call(compare, sapply(m6h1.models, as.name))
+compare_
+```
+
+Model 4 has the lowest WAIC value, and carries most of the weighting: 0.89.
+
+### 6H2
+
+```{r}
+par(mfrow=c(2, 3))
+
+x.seq <- seq(min(d1$age), max(d1$age), length.out=100)
+for (mod_name in m6h1.models) {
+    mod <- get(mod_name)
+    mu <- link(mod, data=data.frame(age=x.seq))
+    mu.mean <- apply(mu, 2, mean)
+    mu.PI <- apply(mu, 2, PI, prob=0.97)
+    plot(height ~ age, data=d1, col="steelblue4")
+    lines(x.seq, mu.mean, type='l')
+    shade(mu.PI, x.seq)
+    title(mod_name)
+}
+```
