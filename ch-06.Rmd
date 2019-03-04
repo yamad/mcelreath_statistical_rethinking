@@ -428,3 +428,57 @@ for (mod_name in m6h1.models) {
     title(mod_name)
 }
 ```
+
+The graphs make clear why model 4 is "best". Models 1-3 do not fit the shape of the data well. Models 1 and 2 are not flexible enough, or perhaps more accurately, the model structure fits the relationship poorly. Model 3 is closer, but is inaccurate at the upper extreme (2 SD above mean). By contrast, despite spending more parameters, models 5 and 6 don't fit much better than model 4.
+
+### 6H4
+
+```{r}
+d2_deviance <- function (mod_name) {
+    mod <- get(mod_name)
+    mu <- link(mod, data=data.frame(age=d2$age))
+    mu.mean <- apply(mu, 2, mean)
+    -2 * sum(dnorm(d2$height, mu.mean, mod@coef[['sigma']], log=TRUE))
+}
+
+d2_devs <- sapply(m6h1.models, d2_deviance)
+d2_devs
+```
+
+```{r}
+par(mfrow=c(1,1))
+plot(d2_devs)
+```
+
+### 6H5
+
+```{r}
+waic_sorted <- compare_@output[order(rownames(compare_@output)),'WAIC']
+test_dev <- cbind(waic_sorted, d2_devs)
+plot(test_dev[,'d2_devs'])
+lines(test_dev[,'waic_sorted'])
+points(test_dev[,'waic_sorted'])
+```
+
+WAIC (solid line) is very close to the true out-of-sample deviance (points). In this case, it is more inaccurate for more complicated models. However, it closely tracks the trend of the true deviance and the relative order.
+
+### 6H6
+
+```{r}
+m6h1.7 <- rethinking::map(
+    alist(
+        height ~ dnorm(mu, sigma),
+        mu <- a + b1*age + b2*age^2 + b3*age^3 + b4*age^4 + b5*age^5 + b6*age^6,
+        a <- dnorm(0, 100),
+        c(b1, b2, b3, b4, b5, b6) <- dnorm(0, 5),
+        sigma ~ dunif(0, 100)
+    ),
+    data=d1, start=list(a=height.start))
+
+WAIC(m6h1.7)
+```
+
+The stronger regularization does not improve WAIC much, suggesting
+that the effective number of parameters is not strongly influenced by
+the priors. Likely there is sufficient information in the data itself
+that the priors are overwhelmed by data.
